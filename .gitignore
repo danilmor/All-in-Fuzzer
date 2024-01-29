@@ -1,0 +1,6 @@
+/.jython_cache/
+/todo
+/test_gui.py
+/.idea/
+/*.class
+/Components/*.class
