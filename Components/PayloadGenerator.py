@@ -8,11 +8,8 @@ class PayloadGenerator():
     def __init__(self, wordlist_dir):
         self.wordlist_dir = wordlist_dir
 
-    def params_payloads(self, url):
+    def params_payloads(self, params):
         payloads = []
-
-        parsed = urlparse.urlparse(url)
-        params = urlparse.parse_qs(parsed.query)
 
         file = open("{}/AppendList.txt".format(self.wordlist_dir), "r")
         fuzz = [line.strip() for line in file.readlines()]
@@ -37,6 +34,15 @@ class PayloadGenerator():
                 payloads.append(new_query)
 
         return payloads
+
+    def params_payloads_from_url(self, url):
+        parsed = urlparse.urlparse(url)
+        params = urlparse.parse_qs(parsed.query)
+        return self.params_payloads(params)
+
+    def params_payloads_from_query(self, query):
+        params = urlparse.parse_qs(query)
+        return self.params_payloads(params)
 
     def headers_payloads(self, headers):
         # type: (list) -> [(str, str)]

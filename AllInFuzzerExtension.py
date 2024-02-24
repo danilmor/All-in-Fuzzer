@@ -19,7 +19,8 @@ from Components.Issue import Issue
 EXTENSION_NAME = "All-In Fuzzer"
 MENU_ITEM_FUZZ_PARAMS = "FUZZ params"
 MENU_ITEM_FUZZ_HEADERS = "FUZZ headers"
-MENU_ITEM_FUZZ_BODY = "FUZZ body (json)"
+MENU_ITEM_FUZZ_BODY_JSON = "FUZZ body (json)"
+MENU_ITEM_FUZZ_BODY_URL = "FUZZ body (url)"
 
 
 class Task(Callable):
@@ -65,10 +66,12 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         self.menuList = []
         self.menuItem1 = JMenuItem(MENU_ITEM_FUZZ_PARAMS, actionPerformed=self.menu_item_click)
         self.menuItem2 = JMenuItem(MENU_ITEM_FUZZ_HEADERS, actionPerformed=self.menu_item_click)
-        self.menuItem3 = JMenuItem(MENU_ITEM_FUZZ_BODY, actionPerformed=self.menu_item_click)
+        self.menuItem3 = JMenuItem(MENU_ITEM_FUZZ_BODY_JSON, actionPerformed=self.menu_item_click)
+        self.menuItem4 = JMenuItem(MENU_ITEM_FUZZ_BODY_URL, actionPerformed=self.menu_item_click)
         self.menuList.append(self.menuItem1)
         self.menuList.append(self.menuItem2)
         self.menuList.append(self.menuItem3)
+        self.menuList.append(self.menuItem4)
         return self.menuList
 
     def menu_item_click(self, event):
@@ -82,8 +85,10 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
                 Thread(target=self.fuzz_params, args=(message, panel, cancellation_token)).start()
             elif event.getActionCommand() == MENU_ITEM_FUZZ_HEADERS:
                 Thread(target=self.fuzz_headers, args=(message, panel, cancellation_token)).start()
-            elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY:
-                Thread(target=self.fuzz_body, args=(message, panel, cancellation_token)).start()
+            elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY_JSON:
+                Thread(target=self.fuzz_body_json, args=(message, panel, cancellation_token)).start()
+            elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY_URL:
+                Thread(target=self.fuzz_body_url, args=(message, panel, cancellation_token)).start()
 
     def show_ui(self, panel_name):
         panel = AllInFuzzerPanel("{}: {}".format(EXTENSION_NAME, panel_name), self.callbacks)
@@ -120,7 +125,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         http_service = selected_messages.getHttpService()
         request_info = self.helpers.analyzeRequest(http_service, request)
         url = request_info.getUrl()
-        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).params_payloads(url.toString())
+        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).params_payloads_from_url(url.toString())
         panel.payload_count = len(payloads)
         executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
 
@@ -147,7 +152,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
 
         executor.shutdown()
 
-    def fuzz_body(self, selected_messages, panel, cancellation_token):
+    def fuzz_body_json(self, selected_messages, panel, cancellation_token):
         request = selected_messages.getRequest()
         http_service = selected_messages.getHttpService()
         request_info = self.helpers.analyzeRequest(http_service, request)
@@ -158,7 +163,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         # send big content length
         panel.payload_count += 1
         new_request = self.utils.update_content_length(request, "!" * 99999)
-        task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY, body, "empty", self.utils.get_settings()["delay"], cancellation_token)
+        task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_JSON, body, "empty", self.utils.get_settings()["delay"], cancellation_token)
         executor.submit(task)
 
         # json 
@@ -167,9 +172,24 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
             panel.payload_count = len(payloads)
             for payload in payloads:
                 new_request = self.utils.update_content_length(request, payload)
-                task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY, body, payload, self.utils.get_settings()["delay"], cancellation_token)
+                task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_JSON, body, payload, self.utils.get_settings()["delay"], cancellation_token)
                 executor.submit(task)
 
+        executor.shutdown()
 
+    def fuzz_body_url(self, selected_messages, panel, cancellation_token):
+        request = selected_messages.getRequest()
+        http_service = selected_messages.getHttpService()
+        request_info = self.helpers.analyzeRequest(http_service, request)
+        body = self.utils.safe_bytes_to_string(request[request_info.getBodyOffset():])
+        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).params_payloads_from_query(body)
+        panel.payload_count = len(payloads)
+        executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
+
+        for new_query in payloads:
+            task = Task(
+                self.make_request,
+                http_service, request, panel, MENU_ITEM_FUZZ_PARAMS, body, new_query, self.utils.get_settings()["delay"], cancellation_token)
+            executor.submit(task)
 
         executor.shutdown()
