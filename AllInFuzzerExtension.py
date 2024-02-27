@@ -189,7 +189,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         for new_query in payloads:
             task = Task(
                 self.make_request,
-                http_service, request, panel, MENU_ITEM_FUZZ_PARAMS, body, new_query, self.utils.get_settings()["delay"], cancellation_token)
+                http_service, request, panel, MENU_ITEM_FUZZ_BODY_URL, body, new_query, self.utils.get_settings()["delay"], cancellation_token)
             executor.submit(task)
 
         executor.shutdown()
