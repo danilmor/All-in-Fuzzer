@@ -9,7 +9,7 @@ from Components.Issue import Issue
 
 
 class IssueTableModel(AbstractTableModel):
-    columnNames = ["#", "Component", "Status code", "Response length", "Header length", "Header count"]
+    columnNames = ["#", "Payload", "Status code", "Response length", "Header length", "Header count"]
     columnClasses = [java.lang.Integer, java.lang.String, java.lang.Integer,
                      java.lang.Integer, java.lang.Integer, java.lang.Integer]
 
@@ -32,7 +32,7 @@ class IssueTableModel(AbstractTableModel):
             if column == 0:
                 return issue.index
             if column == 1:
-                return issue.component
+                return issue.payload
             if column == 2:
                 return issue.status_code
             if column == 3:
@@ -129,6 +129,7 @@ class IssueTableMouseListener(MouseListener):
         allInFuzzerPanel = event.getSource().mainPanel
         assert isinstance(allInFuzzerPanel, AllInFuzzerPanel)
         allInFuzzerPanel.textComponent.text = row_data.component
+        allInFuzzerPanel.textPayload.text = row_data.payload
         allInFuzzerPanel.textStatusCode.text = str(row_data.status_code)
         allInFuzzerPanel.textLength.text = str(row_data.response_length)
         allInFuzzerPanel.textHeaderCount.text = str(row_data.header_count)

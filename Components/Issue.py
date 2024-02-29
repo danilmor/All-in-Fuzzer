@@ -35,10 +35,11 @@ class Issue():
         """Base64 encode the response and store it."""
         self.response = b64encode(resp)
 
-    def __init__(self, request, response, host="", component="", status_code=0, response_length=0, body_offset = 0, header_count=0):
+    def __init__(self, request, response, host="", component="", payload="", status_code=0, response_length=0, body_offset = 0, header_count=0):
         """Create the issue."""
         self.host = host
         self.component = component
+        self.payload = payload
         self.status_code = status_code
         self.response_length = response_length
         self.body_offset = body_offset

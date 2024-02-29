@@ -19,6 +19,7 @@ from Components.Issue import Issue
 EXTENSION_NAME = "All-In Fuzzer"
 MENU_ITEM_FUZZ_PARAMS = "FUZZ params"
 MENU_ITEM_FUZZ_HEADERS = "FUZZ headers"
+MENU_ITEM_FUZZ_COOKIES = "FUZZ cookies"
 MENU_ITEM_FUZZ_BODY_JSON = "FUZZ body (json)"
 MENU_ITEM_FUZZ_BODY_URL = "FUZZ body (url)"
 
@@ -66,12 +67,14 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         self.menuList = []
         self.menuItem1 = JMenuItem(MENU_ITEM_FUZZ_PARAMS, actionPerformed=self.menu_item_click)
         self.menuItem2 = JMenuItem(MENU_ITEM_FUZZ_HEADERS, actionPerformed=self.menu_item_click)
-        self.menuItem3 = JMenuItem(MENU_ITEM_FUZZ_BODY_JSON, actionPerformed=self.menu_item_click)
-        self.menuItem4 = JMenuItem(MENU_ITEM_FUZZ_BODY_URL, actionPerformed=self.menu_item_click)
+        self.menuItem3 = JMenuItem(MENU_ITEM_FUZZ_COOKIES, actionPerformed=self.menu_item_click)
+        self.menuItem4 = JMenuItem(MENU_ITEM_FUZZ_BODY_JSON, actionPerformed=self.menu_item_click)
+        self.menuItem5 = JMenuItem(MENU_ITEM_FUZZ_BODY_URL, actionPerformed=self.menu_item_click)
         self.menuList.append(self.menuItem1)
         self.menuList.append(self.menuItem2)
         self.menuList.append(self.menuItem3)
         self.menuList.append(self.menuItem4)
+        self.menuList.append(self.menuItem5)
         return self.menuList
 
     def menu_item_click(self, event):
@@ -85,6 +88,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
                 Thread(target=self.fuzz_params, args=(message, panel, cancellation_token)).start()
             elif event.getActionCommand() == MENU_ITEM_FUZZ_HEADERS:
                 Thread(target=self.fuzz_headers, args=(message, panel, cancellation_token)).start()
+            elif event.getActionCommand() == MENU_ITEM_FUZZ_COOKIES:
+                Thread(target=self.fuzz_cookies, args=(message, panel, cancellation_token)).start()
             elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY_JSON:
                 Thread(target=self.fuzz_body_json, args=(message, panel, cancellation_token)).start()
             elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY_URL:
@@ -102,19 +107,20 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
             sleep(delay/1000.0)
             new_request = self.utils.safe_bytes_to_string(request).replace(original_payload, new_payload.decode('utf-8'))
             http_request_response = self.callbacks.makeHttpRequest(http_service, new_request)
-            issue = self.create_issue(http_request_response, menu_item)
+            issue = self.create_issue(http_request_response, menu_item, new_payload)
             panel.table.addRow(issue)
             panel.incProgress()
         except Exception as e:
             panel.setTitle("Error: {}".format(e.__class__.__name__))
             raise e
 
-    def create_issue(self, http_request_response, fuzz_item):
+    def create_issue(self, http_request_response, menu_item, payload):
         return Issue(
             http_request_response.getRequest(),
             http_request_response.getResponse(),
             http_request_response.getHttpService().getHost(),
-            fuzz_item,
+            menu_item,
+            payload,
             self.helpers.analyzeResponse(http_request_response.getResponse()).getStatusCode(),
             len(http_request_response.getResponse()),
             self.helpers.analyzeResponse(http_request_response.getResponse()).getBodyOffset(),
@@ -142,12 +148,27 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         http_service = selected_messages.getHttpService()
         request_info = self.helpers.analyzeRequest(http_service, request)
         headers = request_info.getHeaders()
-        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).headers_payloads(headers)
+        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).headers_payloads(headers, skip_headers=["Cookie"])
         panel.payload_count = len(payloads)
         executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
 
         for old_header, new_header in payloads:
-            task = Task(self.make_request, http_service, request, panel, MENU_ITEM_FUZZ_PARAMS, old_header, new_header, self.utils.get_settings()["delay"], cancellation_token)
+            task = Task(self.make_request, http_service, request, panel, MENU_ITEM_FUZZ_HEADERS, old_header, new_header, self.utils.get_settings()["delay"], cancellation_token)
+            executor.submit(task)
+
+        executor.shutdown()
+
+    def fuzz_cookies(self, selected_messages, panel, cancellation_token):
+        request = selected_messages.getRequest()
+        http_service = selected_messages.getHttpService()
+        request_info = self.helpers.analyzeRequest(http_service, request)
+        headers = request_info.getHeaders()
+        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).cookies_payloads(headers)
+        panel.payload_count = len(payloads)
+        executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
+
+        for old_cookies, new_cookies in payloads:
+            task = Task(self.make_request, http_service, request, panel, MENU_ITEM_FUZZ_COOKIES, old_cookies, new_cookies, self.utils.get_settings()["delay"], cancellation_token)
             executor.submit(task)
 
         executor.shutdown()

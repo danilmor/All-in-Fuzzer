@@ -1,6 +1,7 @@
 import urlparse
 import json
 import copy
+from Cookie import SimpleCookie
 
 
 class PayloadGenerator():
@@ -44,7 +45,7 @@ class PayloadGenerator():
         params = urlparse.parse_qs(query)
         return self.params_payloads(params)
 
-    def headers_payloads(self, headers):
+    def headers_payloads(self, headers, skip_headers=list):
         # type: (list) -> [(str, str)]
 
         payloads = []
@@ -59,6 +60,10 @@ class PayloadGenerator():
 
             header_name = split[0]
             header_value = split[1]
+
+            for skip in skip_headers:
+                if split[0].lower() == skip.lower():
+                    continue
 
             # insert at the end of the header
             for f in fuzz:
@@ -121,5 +126,59 @@ class PayloadGenerator():
 
         for f in fuzz:
             [payloads.append(p.replace('"FUZZ"', f)) for p in payloads_fuzz]
+
+        return payloads
+
+    def cookies_payloads(self, headers):
+        def encode_cookie(cookies):
+            result = ""
+            for cookie_param_name in cookies:
+                result += "{}={}; ".format(cookie_param_name, cookies[cookie_param_name])
+            return result
+
+        payloads = []
+        cookie_header = ""
+        cookie_value = ""
+        cookie_original = ""
+        file = open("{}/AppendList.txt".format(self.wordlist_dir), "r")
+        fuzz = [line.strip() for line in file.readlines()]
+
+        for header in headers:
+            split = header.split(":", 1)
+            if len(split) != 2:
+                continue
+            if split[0].lower() == "cookie":
+                cookie_header = split[0].encode()
+                cookie_value = split[1].encode()
+                cookie_original = header
+                break
+
+        cookies_simple = SimpleCookie()
+        cookies_simple.load(cookie_value)
+        cookies_dict = {k: v.value for k, v in cookies_simple.items()}
+
+        for cookie_param_name in cookies_dict:
+            for f in fuzz:
+                cookie_param_value = cookies_dict[cookie_param_name]
+                cookies_dict[cookie_param_name] = cookie_param_value + f
+                payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
+                cookies_dict[cookie_param_name] = cookie_param_value
+
+        for cookie_param_name in cookies_dict:
+            for f in fuzz:
+                cookie_param_value = cookies_dict[cookie_param_name]
+                cookies_dict[cookie_param_name] = f + cookie_param_value
+                payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
+                cookies_dict[cookie_param_name] = cookie_param_value
+
+        # Experimental. RFC 2109,2965
+        cookies_dict["$Version"] = '"0"'
+        payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
+        cookies_dict["$Version"] = "0"
+        payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
+        cookies_dict["$Version"] = '"1"'
+        payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
+        cookies_dict["$Version"] = "1"
+        payloads.append((cookie_original, "{}: {}".format(cookie_header, encode_cookie(cookies_dict))))
 
         return payloads
