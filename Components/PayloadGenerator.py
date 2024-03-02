@@ -22,7 +22,6 @@ class PayloadGenerator():
                 new_params = copy.deepcopy(params)
                 new_params[param] += f
                 new_query = '&'.join(["{}={}".format(key, ''.join(value)) for key, value in new_params.items()])
-                new_query = new_query.replace(' ', "%09")
                 payloads.append(new_query)
 
         # insert at the start of the parameter
@@ -31,10 +30,15 @@ class PayloadGenerator():
                 new_params = copy.deepcopy(params)
                 new_params[param] = [f + ''.join(new_params[param])]
                 new_query = '&'.join(["{}={}".format(key, ''.join(value)) for key, value in new_params.items()])
-                new_query = new_query.replace(' ', "%09")
                 payloads.append(new_query)
 
-        return payloads
+        for i, payload in enumerate(payloads):
+            payloads[i] = (payload
+                           .replace('\t', "%09")
+                           .replace(' ', "%20")
+                           .replace('\n', "%0a"))
+
+        return list(dict.fromkeys(payloads))
 
     def params_payloads_from_url(self, url):
         parsed = urlparse.urlparse(url)

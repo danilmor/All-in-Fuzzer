@@ -181,7 +181,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         body = self.utils.safe_bytes_to_string(request[request_info.getBodyOffset():])
         executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
 
-        # send big content length
+        # Send big content length first. Because it's a long time to wait for an answer
         panel.payload_count += 1
         new_request = self.utils.update_content_length(request, "!" * 99999)
         task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_JSON, body, "empty", self.utils.get_settings()["delay"], cancellation_token)
@@ -193,7 +193,9 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
             panel.payload_count = len(payloads)
             for payload in payloads:
                 new_request = self.utils.update_content_length(request, payload)
-                task = Task(self.make_request, http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_JSON, body, payload, self.utils.get_settings()["delay"], cancellation_token)
+                task = Task(
+                    self.make_request,
+                    http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_JSON, body, payload, self.utils.get_settings()["delay"], cancellation_token)
                 executor.submit(task)
 
         executor.shutdown()
@@ -207,10 +209,11 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         panel.payload_count = len(payloads)
         executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
 
-        for new_query in payloads:
+        for payload in payloads:
+            new_request = self.utils.update_content_length(request, payload)
             task = Task(
                 self.make_request,
-                http_service, request, panel, MENU_ITEM_FUZZ_BODY_URL, body, new_query, self.utils.get_settings()["delay"], cancellation_token)
+                http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_URL, body, payload, self.utils.get_settings()["delay"], cancellation_token)
             executor.submit(task)
 
         executor.shutdown()
