@@ -45,3 +45,11 @@ class AllInFuzzerUtils():
             new_request_bytes = self.helpers.stringToBytes(new_request)
             return new_request_bytes
 
+        # if content-length not found
+        new_header = "{}: {}".format("content-length", len(payload.decode('utf-8')))
+        headers.append(new_header)
+        new_request = '\r\n'.join(headers)
+        new_request += '\r\n\r\n'
+        new_request += payload
+        new_request_bytes = self.helpers.stringToBytes(new_request)
+        return new_request_bytes

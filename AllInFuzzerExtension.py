@@ -22,6 +22,7 @@ MENU_ITEM_FUZZ_HEADERS = "FUZZ headers"
 MENU_ITEM_FUZZ_COOKIES = "FUZZ cookies"
 MENU_ITEM_FUZZ_BODY_JSON = "FUZZ body (json)"
 MENU_ITEM_FUZZ_BODY_URL = "FUZZ body (url)"
+MENU_ITEM_FUZZ_SELECTED = "FUZZ selected"
 
 
 class Task(Callable):
@@ -70,11 +71,13 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         self.menuItem3 = JMenuItem(MENU_ITEM_FUZZ_COOKIES, actionPerformed=self.menu_item_click)
         self.menuItem4 = JMenuItem(MENU_ITEM_FUZZ_BODY_JSON, actionPerformed=self.menu_item_click)
         self.menuItem5 = JMenuItem(MENU_ITEM_FUZZ_BODY_URL, actionPerformed=self.menu_item_click)
+        self.menuItem6 = JMenuItem(MENU_ITEM_FUZZ_SELECTED, actionPerformed=self.menu_item_click)
         self.menuList.append(self.menuItem1)
         self.menuList.append(self.menuItem2)
         self.menuList.append(self.menuItem3)
         self.menuList.append(self.menuItem4)
         self.menuList.append(self.menuItem5)
+        self.menuList.append(self.menuItem6)
         return self.menuList
 
     def menu_item_click(self, event):
@@ -82,6 +85,7 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         panel = self.show_ui(event.getActionCommand())
         panel.addWindowListener(CancellationWindowAdapter(cancellation_token))
         selected_messages = self.invocation.getSelectedMessages()
+        selection_bounds = self.invocation.getSelectionBounds()
 
         for message in selected_messages:
             if event.getActionCommand() == MENU_ITEM_FUZZ_PARAMS:
@@ -94,6 +98,8 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
                 Thread(target=self.fuzz_body_json, args=(message, panel, cancellation_token)).start()
             elif event.getActionCommand() == MENU_ITEM_FUZZ_BODY_URL:
                 Thread(target=self.fuzz_body_url, args=(message, panel, cancellation_token)).start()
+            elif event.getActionCommand() == MENU_ITEM_FUZZ_SELECTED:
+                Thread(target=self.fuzz_selected, args=(message, selection_bounds, panel, cancellation_token)).start()
 
     def show_ui(self, panel_name):
         panel = AllInFuzzerPanel("{}: {}".format(EXTENSION_NAME, panel_name), self.callbacks)
@@ -215,5 +221,39 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
                 self.make_request,
                 http_service, new_request, panel, MENU_ITEM_FUZZ_BODY_URL, body, payload, self.utils.get_settings()["delay"], cancellation_token)
             executor.submit(task)
+
+        executor.shutdown()
+
+    def fuzz_selected(self, selected_messages, selection_bounds, panel, cancellation_token):
+
+        request = selected_messages.getRequest()
+        http_service = selected_messages.getHttpService()
+        request_info = self.helpers.analyzeRequest(http_service, request)
+        selected = self.utils.safe_bytes_to_string(request[selection_bounds[0]:selection_bounds[1]])
+        body_offset = request_info.getBodyOffset()
+        payloads = PayloadGenerator(self.utils.get_wordlists_dir()).selected_payloads(selected)
+        panel.payload_count = len(payloads)
+        executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
+
+        import pdb;pdb.set_trace()
+        # selected in the body
+        if selection_bounds[0] >= body_offset:
+            body = self.utils.safe_bytes_to_string(request[body_offset:])
+            for payload in payloads:
+                body_array = list(body)
+                body_array[selection_bounds[0] - body_offset: selection_bounds[1] - body_offset] = list(payload)
+                new_body = ''.join(body_array)
+                new_request = self.utils.update_content_length(request, new_body)
+                task = Task(
+                    self.make_request,
+                    http_service, new_request, panel, MENU_ITEM_FUZZ_SELECTED, body, new_body,
+                    self.utils.get_settings()["delay"], cancellation_token)
+                executor.submit(task)
+        # selected outside the body
+        else:
+            for payload in payloads:
+                task = Task(self.make_request, http_service, request, panel, MENU_ITEM_FUZZ_SELECTED, selected,
+                            payload, self.utils.get_settings()["delay"], cancellation_token)
+                executor.submit(task)
 
         executor.shutdown()

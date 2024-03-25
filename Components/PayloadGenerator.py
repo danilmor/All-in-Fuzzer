@@ -9,6 +9,19 @@ class PayloadGenerator():
     def __init__(self, wordlist_dir):
         self.wordlist_dir = wordlist_dir
 
+    def selected_payloads(self, selected):
+        payloads = []
+        file = open("{}/AppendList.txt".format(self.wordlist_dir), "r")
+        fuzz = [line.strip() for line in file.readlines()]
+        fuzz.append('\x00')
+
+        # insert at the start and end of the parameter
+        for f in fuzz:
+            payloads.append(selected + f)
+            payloads.append(f + selected)
+
+        return payloads
+
     def params_payloads(self, params):
         payloads = []
 
