@@ -12,21 +12,27 @@ This is an extension for Burp Suite that allows you to easily fuzz selected
 - FUZZ body (url)
 - FUZZ selected text
 
+
 # Usage
+#### Choose the fuzzing option
 ```
 Right-click on the request -> Extensions -> All-in Fuzzer -> Choose the fuzzing option
 ```
-![image](https://github.com/danilmor/All-in-Fuzzer/assets/50376588/35f854d4-fa1d-4f88-93cf-6dcff9be9e4a)
+![image](https://github.com/danilmor/All-in-Fuzzer/assets/50376588/90959a28-ab52-4db3-bd0f-34e0fecfcaf6)
+
+#### Look for anomalies
+![image](https://github.com/danilmor/All-in-Fuzzer/assets/50376588/b104964c-0d0f-4a03-a4d3-d2953175c9b3)
+
 
 # Installation
 
-1) Install Jython https://www.jython.org/download
-2) Add Jython to burp
+#### 1) Install Jython https://www.jython.org/download
+#### 2) Add Jython to burp
 ```
 Settings -> Extensions -> Python environment -> Set jython.jar in "Location of Jython standalone JAR file"
 ```
 ![image](https://github.com/danilmor/All-in-Fuzzer/assets/50376588/259d1bee-ae24-4dec-84b4-5334ea15435a)
-3) Add extension
+#### 3) Add extension
 ```
 Extensions -> Installed -> Add
 ```
