@@ -235,7 +235,6 @@ class BurpExtender(IBurpExtender, ITab, IContextMenuFactory):
         panel.payload_count = len(payloads)
         executor = Executors.newFixedThreadPool(self.utils.get_settings()["threads"])
 
-        import pdb;pdb.set_trace()
         # selected in the body
         if selection_bounds[0] >= body_offset:
             body = self.utils.safe_bytes_to_string(request[body_offset:])
