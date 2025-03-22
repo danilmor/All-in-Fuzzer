@@ -41,7 +41,8 @@ a@
 ?*
 %
 %0B
-%0D%0A%0D%0A
+%0D%0Atest:foo
+%0D%0A%0D%0Atest:foo
 %00
 %0C
 %0C
